@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"regexp"
 	"strings"
@@ -102,8 +103,15 @@ func (l *LogProcess) Process() {
 		}
 
 		message := &Message{}
-		message.SourceIp = ret[1]                              // 访问源
-		message.SourceLocation = GetLocation(message.SourceIp) // 访问源所处的地区
+		message.SourceIp = ret[1] // 访问源
+		// message.SourceLocation = GetLocation(message.SourceIp) // 访问源所处的地区
+		out, err := exec.Command("/usr/bin/nali", ret[1]).Output()
+		if err != nil {
+			log.Println("error:", err.Error())
+		}
+		for _, data := range strings.Split(string(out), " ")[1:] {
+			message.SourceLocation += data // 访问源所处的地区
+		}
 		message.Method = ret[4]
 		message.Path = ret[5]   //此时可以直接从结构体中取到path
 		message.Scheme = ret[6] //HTTP/1.0协议可以直接赋值给mess
@@ -145,7 +153,6 @@ func (w *WriteToInfluxDB) Writer(wc chan *Message) {
 
 		// 需要展示的值
 		fields := map[string]interface{}{
-
 			"SourceIp":       v.SourceIp,
 			"SourceLocation": v.SourceLocation,
 			"SourceHostInfo": v.SourceHostInfo,
@@ -174,7 +181,7 @@ func (w *WriteToInfluxDB) Writer(wc chan *Message) {
 func main() {
 	var path, influxDsn string
 	flag.StringVar(&path, "path", "./access.log", "read file path") //"帮助信息"
-	flag.StringVar(&influxDsn, "influxDsn", "http://127.0.0.1:8086@root@insur132@myself@s@nginx_log", "influx data source")
+	flag.StringVar(&influxDsn, "influxDsn", "http://172.20.10.111:8086@root@insur132@myself@s@nginx_private", "influx data source")
 
 	flag.Parse() //解析参数
 	r := &ReadFromFile{
